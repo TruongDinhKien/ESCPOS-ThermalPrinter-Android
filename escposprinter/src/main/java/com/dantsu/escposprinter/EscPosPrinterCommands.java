@@ -79,6 +79,8 @@ public class EscPosPrinterCommands {
     public static final int QRCODE_1 = 49;
     public static final int QRCODE_2 = 50;
 
+    public static final int MAXIMUM_SEND_BUFFER_SIZE = 512;
+    
     private DeviceConnection printerConnection;
     private EscPosCharsetEncoding charsetEncoding;
     private boolean useEscAsteriskCommand;
@@ -587,11 +589,22 @@ public class EscPosPrinterCommands {
             return this;
         }
 
-        byte[][] bytesToPrint = this.useEscAsteriskCommand ? EscPosPrinterCommands.convertGSv0ToEscAsterisk(image) : new byte[][]{image};
+        byte[][] bytesToPrint = this.useEscAsteriskCommand
+            ? EscPosPrinterCommands.convertGSv0ToEscAsterisk(image)
+            : new byte[][]{ image };
 
         for (byte[] bytes : bytesToPrint) {
-            this.printerConnection.write(bytes);
-            this.printerConnection.send();
+            int offset = 0;
+
+            while (offset < bytes.length) {
+                int length = Math.min(MAXIMUM_SEND_BUFFER_SIZE, bytes.length - offset);
+                byte[] chunk = new byte[length];
+                System.arraycopy(bytes, offset, chunk, 0, length);
+
+                this.printerConnection.write(chunk);
+                this.printerConnection.send();
+                offset += length;
+            }
         }
 
         return this;
